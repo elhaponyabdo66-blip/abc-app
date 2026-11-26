@@ -30,13 +30,20 @@ h2{font-size:24px;margin:0 0 4px}
 .hero{background:var(--bgc);color:var(--fg);border-radius:20px;padding:18px;display:flex;align-items:center;gap:16px;box-shadow:0 6px 0 rgba(0,0,0,.28);margin-bottom:20px}
 .hero .ltr{font-size:52px}.hero p{margin:0;opacity:.92}
 .fld{display:block;font-size:14px;color:var(--mut);margin-bottom:16px}
-select{display:block;width:100%;margin-top:6px;padding:12px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--ink);font:16px inherit;font-family:inherit}
+select,input{display:block;width:100%;margin-top:6px;padding:12px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--ink);font:16px inherit;font-family:inherit}
 .list{display:flex;flex-direction:column;gap:10px}
 .row{display:flex;align-items:center;gap:14px;text-align:start;width:100%;padding:12px;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:14px;font-family:inherit;cursor:pointer}
 .bd{flex:none;width:44px;height:44px;border-radius:12px;background:var(--bgc,var(--n));display:grid;place-items:center;font-size:22px;font-weight:800;color:#fff}
 .tx{flex:1;display:flex;flex-direction:column}.tx strong{font-size:16px}.tx small{color:var(--mut);font-size:13px}
 .row em{font-style:normal;font-size:12px;color:var(--mut);border:1px solid var(--line);border-radius:99px;padding:2px 10px;white-space:nowrap}
+.row em.ok{color:var(--g);border-color:var(--g)}
 .link{margin-top:18px;background:none;border:0;color:var(--mut);font:14px inherit;font-family:inherit;text-decoration:underline;cursor:pointer}
+.btn{width:100%;margin:6px 0 18px;background:var(--g);color:#fff;border:0;border-radius:12px;padding:14px;font:700 16px inherit;font-family:inherit;box-shadow:0 4px 0 rgba(0,0,0,.28);cursor:pointer}
+.btn:active{transform:translateY(3px);box-shadow:0 1px 0 rgba(0,0,0,.28)}
+.stat{display:inline-block;background:var(--card);border:1px solid var(--line);border-radius:99px;padding:2px 14px;margin:0 0 14px;color:var(--mut)}
+.stat b{color:var(--ink)}
+.del{flex:none;background:none;border:0;color:var(--r);font-size:20px;padding:6px 10px;cursor:pointer}
+.st{cursor:default}
 #toast{position:fixed;inset-inline:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));max-width:488px;margin:auto;background:var(--ink);color:var(--bg);padding:12px 16px;border-radius:12px;opacity:0;transform:translateY(12px);transition:.25s;pointer-events:none}
 #toast.on{opacity:1;transform:none}
 :focus-visible{outline:3px solid var(--a);outline-offset:2px}
@@ -51,6 +58,7 @@ select{display:block;width:100%;margin-top:6px;padding:12px;border-radius:12px;b
 <div id="toast" role="status" aria-live="polite"></div>
 <script>
 const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const ROLES={
  student:{n:'طالب',l:'ط',c:'g',h:'راجع دروسك، والعب، واختبر نفسك'},
  teacher:{n:'معلم',l:'م',c:'r',h:'حضّر حصصك وامتحاناتك في دقائق'},
@@ -61,33 +69,69 @@ const MODS={
  teacher:[['محضّر الدروس الذكي','خطة الحصة والأهداف والأنشطة بالذكاء الاصطناعي',3],['بنك الامتحانات','أنشئ نماذج وصحّحها تلقائيًا',4],['متابعة الطلاب','الحضور والدرجات ونقاط الضعف',5],['المذكرات والملخصات','ملخصات جاهزة للطباعة',7]],
  student:[['ألعاب المراجعة','تحديات وبطاقات تلخّص المنهج',6],['امتحاناتي','حلّ الامتحانات وشاهد نتيجتك',4],['مذكراتي','ملخصات ومراجعات لكل مادة',7],['تقدّمي','نقاطك وشاراتك ومستواك',5]],
  parent:[['مستوى ابني','الدرجات ونقاط القوة والضعف',5],['الحضور والغياب','سجل الحضور اليومي',5],['رسائل المعلمين','تواصل مباشر مع المعلم',8]],
- admin:[['الطلاب والفصول','إضافة الطلاب وتوزيعهم',2],['الحضور','حضور الطلاب والمعلمين',5],['التقارير','تقارير شاملة للمدرسة',5]]
+ admin:[['الطلاب والفصول','إضافة الطلاب وتوزيعهم',2,'students'],['الحضور','حضور الطلاب والمعلمين',5],['التقارير','تقارير شاملة للمدرسة',5]]
 };
 const STAGES=['الأول','الثاني','الثالث','الرابع','الخامس','السادس','السابع','الثامن','التاسع'].map(x=>'الصف '+x+' أساسي').concat(['الأول الثانوي','الثاني الثانوي','الثالث الثانوي']);
-let S={role:null,stage:0};
+let S={role:null,stage:0},D={students:[]},V='';
 try{Object.assign(S,JSON.parse(localStorage.getItem('abc')||'{}'))}catch(e){}
+try{Object.assign(D,JSON.parse(localStorage.getItem('abc_d')||'{}'))}catch(e){}
 const save=()=>{try{localStorage.setItem('abc',JSON.stringify(S))}catch(e){}};
+const saveD=()=>{try{localStorage.setItem('abc_d',JSON.stringify(D))}catch(e){}};
 function render(){
  const app=$('#app');
  if(!ROLES[S.role]){
   app.innerHTML=`<section><h2>من يستخدم التطبيق؟</h2><p class="lead">اختر دورك لتظهر لك الأدوات المناسبة.</p><div class="tiles">${Object.entries(ROLES).map(([k,r])=>`<button class="tile ${r.c}" data-role="${k}"><span class="ltr">${r.l}</span><span>${r.n}</span></button>`).join('')}</div></section>`;
   return;
  }
+ if(V==='students'&&S.role==='admin'){viewStudents();return}
  const r=ROLES[S.role];
  app.innerHTML=`<section><div class="hero ${r.c}"><span class="ltr">${r.l}</span><div><h2>${r.n}</h2><p>${r.h}</p></div></div>
  <label class="fld">المرحلة الدراسية<select id="stage">${STAGES.map((s,i)=>`<option value="${i}"${i===S.stage?' selected':''}>${s}</option>`).join('')}</select></label>
- <div class="list ${r.c}">${MODS[S.role].map(m=>`<button class="row" data-t="${m[0]}" data-n="${m[2]}"><span class="bd">${m[0][0]}</span><span class="tx"><strong>${m[0]}</strong><small>${m[1]}</small></span><em>المرحلة ${m[2]}</em></button>`).join('')}</div>
+ <div class="list ${r.c}">${MODS[S.role].map(m=>`<button class="row" data-t="${m[0]}" data-n="${m[2]}" data-k="${m[3]||''}"><span class="bd">${m[0][0]}</span><span class="tx"><strong>${m[0]}</strong><small>${m[1]}</small></span><em class="${m[3]?'ok':''}">${m[3]?'جاهز':'المرحلة '+m[2]}</em></button>`).join('')}</div>
  <button class="link" data-role="">تغيير الدور</button></section>`;
+}
+function viewStudents(){
+ $('#app').innerHTML=`<section><button class="link" data-view="" style="margin:0 0 10px">→ رجوع</button>
+ <h2>الطلاب والفصول</h2><div class="stat"><b id="cnt">0</b> طالب</div>
+ <label class="fld">اسم الطالب<input id="nm" type="text" placeholder="الاسم الكامل" autocomplete="off"></label>
+ <label class="fld">الصف<select id="stg">${STAGES.map((s,i)=>`<option value="${i}">${s}</option>`).join('')}</select></label>
+ <label class="fld">رقم ولي الأمر (اختياري)<input id="ph" type="tel" placeholder="09XXXXXXXX" dir="ltr"></label>
+ <button class="btn" id="add">إضافة الطالب</button>
+ <label class="fld">بحث<input id="q" type="search" placeholder="ابحث باسم الطالب"></label>
+ <label class="fld">تصفية حسب الصف<select id="fs"><option value="">كل الصفوف</option>${STAGES.map((s,i)=>`<option value="${i}">${s}</option>`).join('')}</select></label>
+ <div class="list" id="lst"></div></section>`;
+ listStudents();
+}
+function listStudents(){
+ const q=($('#q').value||'').trim(),f=$('#fs').value;
+ const a=D.students.filter(s=>(!q||s.name.includes(q))&&(f===''||String(s.stage)===f));
+ $('#cnt').textContent=D.students.length;
+ $('#lst').innerHTML=a.length?a.map(s=>`<div class="row st"><span class="bd">${esc(s.name[0]||'؟')}</span><span class="tx"><strong>${esc(s.name)}</strong><small>${esc(STAGES[s.stage]||'')}${s.phone?' · '+esc(s.phone):''}</small></span><button class="del" data-del="${s.id}" aria-label="حذف الطالب">✕</button></div>`).join(''):'<p class="lead">لا يوجد طلاب بعد. أضف أول طالب من الأعلى.</p>';
 }
 let tt;
 function toast(t){const e=$('#toast');e.textContent=t;e.classList.add('on');clearTimeout(tt);tt=setTimeout(()=>e.classList.remove('on'),2600)}
 document.addEventListener('click',e=>{
  const a=e.target.closest('[data-role]');
- if(a){S.role=a.dataset.role||null;save();render();window.scrollTo(0,0);return}
+ if(a){S.role=a.dataset.role||null;V='';save();render();window.scrollTo(0,0);return}
+ const b=e.target.closest('[data-view]');
+ if(b){V=b.dataset.view;render();window.scrollTo(0,0);return}
+ if(e.target.closest('#add')){
+  const name=$('#nm').value.trim();
+  if(!name){toast('اكتب اسم الطالب أولًا');return}
+  D.students.unshift({id:Date.now(),name,stage:+$('#stg').value,phone:$('#ph').value.trim()});
+  saveD();$('#nm').value='';$('#ph').value='';listStudents();toast('تمت إضافة الطالب');return;
+ }
+ const d=e.target.closest('[data-del]');
+ if(d){if(confirm('حذف هذا الطالب؟')){D.students=D.students.filter(s=>String(s.id)!==d.dataset.del);saveD();listStudents()}return}
  const m=e.target.closest('.row');
- if(m)toast('«'+m.dataset.t+'» تُضاف في المرحلة '+m.dataset.n+' من الخطة');
+ if(m&&m.dataset.k==='students'){V='students';render();window.scrollTo(0,0);return}
+ if(m&&m.dataset.t)toast('«'+m.dataset.t+'» تُضاف في المرحلة '+m.dataset.n+' من الخطة');
 });
-document.addEventListener('change',e=>{if(e.target.id==='stage'){S.stage=+e.target.value;save()}});
+document.addEventListener('input',e=>{if(e.target.id==='q')listStudents()});
+document.addEventListener('change',e=>{
+ if(e.target.id==='stage'){S.stage=+e.target.value;save()}
+ if(e.target.id==='fs')listStudents();
+});
 render();
 </script>
 </body>
