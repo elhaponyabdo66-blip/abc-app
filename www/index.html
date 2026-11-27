@@ -9,6 +9,7 @@
 :root{--bg:#EEF3F6;--ink:#0B2545;--mut:#5A6B7E;--card:#fff;--line:#D5DEE6;--g:#0F8B5F;--r:#D1332E;--n:#0B2545;--a:#E0A526;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 @media(prefers-color-scheme:dark){:root{--bg:#08151F;--ink:#E8EEF3;--mut:#93A4B5;--card:#10222F;--line:#1F3445;--n:#1D4577}}
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 html,body{margin:0}
 body{background:var(--bg);color:var(--ink);font-family:system-ui,"Segoe UI",Tahoma,sans-serif;line-height:1.6;min-height:100vh}
 .wrap{max-width:520px;margin:0 auto;padding:16px}
@@ -42,6 +43,7 @@ select,input,textarea{display:block;width:100%;margin-top:6px;padding:12px;borde
 .link{margin-top:18px;background:none;border:0;color:var(--mut);font:14px inherit;font-family:inherit;text-decoration:underline;cursor:pointer}
 .btn{width:100%;margin:6px 0 18px;background:var(--g);color:#fff;border:0;border-radius:12px;padding:14px;font:700 16px inherit;font-family:inherit;box-shadow:0 4px 0 rgba(0,0,0,.28);cursor:pointer}
 .btn:active{transform:translateY(3px);box-shadow:0 1px 0 rgba(0,0,0,.28)}
+.btn:disabled{opacity:.6}
 .b2{background:var(--n)}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
 .two .btn{margin:0}
@@ -52,6 +54,9 @@ select,input,textarea{display:block;width:100%;margin-top:6px;padding:12px;borde
 .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin:14px 0}
 .card h3{margin:0 0 2px}.card h4{margin:14px 0 4px;color:var(--g)}
 .card ul,.card ol{margin:0;padding-inline-start:22px}
+.card li{margin-bottom:4px}
+.card li.ok{color:var(--g);font-weight:700}
+#pv{display:block;max-width:100%;max-height:220px;border-radius:12px;margin:8px 0}
 .fc{width:100%;height:auto;max-width:340px;display:block;margin:8px auto}
 .fc rect{fill:var(--bg);stroke:var(--g);stroke-width:2}
 .fc text{fill:var(--ink);font-size:12px}
@@ -70,8 +75,9 @@ select,input,textarea{display:block;width:100%;margin-top:6px;padding:12px;borde
 </div>
 <div id="toast" role="status" aria-live="polite"></div>
 <script>
+const API='https://abc-ai.elhaponyabdo66.workers.dev';
 const $=s=>document.querySelector(s);
-const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const ROLES={
  student:{n:'طالب',l:'ط',c:'g',h:'راجع دروسك، والعب، واختبر نفسك'},
  teacher:{n:'معلم',l:'م',c:'r',h:'حضّر حصصك وامتحاناتك في دقائق'},
@@ -79,26 +85,20 @@ const ROLES={
  admin:{n:'إدارة',l:'إ',c:'a',h:'أدر الفصول والحضور والتقارير'}
 };
 const MODS={
- teacher:[['محضّر الدروس','صوّر الدرس واحصل على خطة حصة ومخطط انسيابي',3,'lesson'],['بنك الامتحانات','أنشئ نماذج وصحّحها تلقائيًا',4],['متابعة الطلاب','الحضور والدرجات ونقاط الضعف',5],['المذكرات والملخصات','ملخصات جاهزة للطباعة',7]],
+ teacher:[['محضّر الدروس','صوّر الدرس واحصل على تحضير كامل ومخطط انسيابي',3,'lesson'],['بنك الامتحانات','أنشئ نماذج وصحّحها تلقائيًا',4],['متابعة الطلاب','الحضور والدرجات ونقاط الضعف',5],['المذكرات والملخصات','ملخصات جاهزة للطباعة',7]],
  student:[['ألعاب المراجعة','تحديات وبطاقات تلخّص المنهج',6],['امتحاناتي','حلّ الامتحانات وشاهد نتيجتك',4],['مذكراتي','ملخصات ومراجعات لكل مادة',7],['تقدّمي','نقاطك وشاراتك ومستواك',5]],
  parent:[['مستوى ابني','الدرجات ونقاط القوة والضعف',5],['الحضور والغياب','سجل الحضور اليومي',5],['رسائل المعلمين','تواصل مباشر مع المعلم',8]],
  admin:[['الطلاب والفصول','إضافة الطلاب وتوزيعهم',2,'students'],['الحضور','حضور الطلاب والمعلمين',5],['التقارير','تقارير شاملة للمدرسة',5]]
 };
 const STAGES=['الأول','الثاني','الثالث','الرابع','الخامس','السادس','السابع','الثامن','التاسع'].map(x=>'الصف '+x+' أساسي').concat(['الأول الثانوي','الثاني الثانوي','الثالث الثانوي']);
-const SUBJ=[['اللغة العربية','Arabic','lang'],['اللغة الإنجليزية','English','lang'],['الرياضيات','Mathematics','math'],['العلوم','Science','sci'],['الفيزياء','Physics','sci'],['الكيمياء','Chemistry','sci'],['الأحياء','Biology','sci'],['الجيولوجيا','Geology','sci'],['التربية الإسلامية','Islamic Studies','gen'],['الاجتماعيات','Social Studies','gen'],['التاريخ','History','gen'],['الجغرافيا','Geography','gen'],['الحاسوب','Computer','gen'],['التربية الفنية','Art','gen'],['التربية البدنية','Physical Education','gen']];
-const LANGS={ar:'ara',en:'eng',both:'ara+eng'};
-const ACT={
- lang:[['قراءة جهرية للنص من عدد من الطلاب.','نشاط إملاء أو تعبير قصير حول الدرس.'],['Students read the text aloud in turns.','Short dictation or writing task about the lesson.']],
- math:[['حلّ مثال على السبورة خطوة بخطوة.','تمارين متدرجة في الصعوبة يحلها الطلاب في مجموعات.'],['Solve a worked example on the board step by step.','Graded exercises solved by students in groups.']],
- sci:[['نشاط عملي أو عرض توضيحي مرتبط بالدرس.','مناقشة جماعية: ماذا لاحظنا ولماذا؟'],['A hands-on activity or demonstration linked to the lesson.','Group discussion: what did we observe and why?']],
- gen:[['نقاش جماعي حول فكرة الدرس.','عمل في مجموعات لتلخيص الدرس في خريطة أو جدول.'],['Group discussion about the main idea.','Groups summarise the lesson in a map or table.']]
-};
-const STOP=new Set('التي الذي الذين هذا هذه ذلك تلك على إلى عن في من أن إن كان كانت هناك بين عند حيث كما ثم لكن قد لقد يمكن أيضا أيضًا بعد قبل كل بعض that this with from have which their there been were they what when will your about into than then also these those them some such more most other only each because while where'.split(' '));
-let S={role:null,stage:0},D={students:[],lessons:[]},V='',CUR=null,CURT='';
+const SUBJ=[['اللغة العربية','Arabic'],['اللغة الإنجليزية','English'],['الرياضيات','Mathematics'],['العلوم','Science'],['الفيزياء','Physics'],['الكيمياء','Chemistry'],['الأحياء','Biology'],['الجيولوجيا','Geology'],['التربية الإسلامية','Islamic Studies'],['الاجتماعيات','Social Studies'],['التاريخ','History'],['الجغرافيا','Geography'],['الحاسوب','Computer'],['التربية الفنية','Art'],['التربية البدنية','Physical Education']];
+let S={role:null,stage:0},D={students:[],lessons:[]},V='',CUR=null,CURT='',IMG=null;
 try{Object.assign(S,JSON.parse(localStorage.getItem('abc')||'{}'))}catch(e){}
 try{Object.assign(D,JSON.parse(localStorage.getItem('abc_d')||'{}'))}catch(e){}
+D.lessons=(D.lessons||[]).filter(l=>l&&l.plan);
 const save=()=>{try{localStorage.setItem('abc',JSON.stringify(S))}catch(e){}};
 const saveD=()=>{try{localStorage.setItem('abc_d',JSON.stringify(D))}catch(e){}};
+const getCode=()=>{try{return localStorage.getItem('abc_code')||''}catch(e){return ''}};
 function render(){
  const app=$('#app');
  if(!ROLES[S.role]){
@@ -131,16 +131,9 @@ function listStudents(){
  $('#cnt').textContent=D.students.length;
  $('#lst').innerHTML=a.length?a.map(s=>`<div class="row st"><span class="bd">${esc(s.name[0]||'؟')}</span><span class="tx"><strong>${esc(s.name)}</strong><small>${esc(STAGES[s.stage]||'')}${s.phone?' · '+esc(s.phone):''}</small></span><button class="del" data-del="${s.id}" aria-label="حذف الطالب">✕</button></div>`).join(''):'<p class="lead">لا يوجد طلاب بعد. أضف أول طالب من الأعلى.</p>';
 }
-/* ---------- محضّر الدروس ---------- */
-const toks=t=>t.split(/[^\p{L}\p{M}]+/u).filter(Boolean);
-function keywords(t){
- const m={};
- toks(t).forEach(w=>{const k=w.toLowerCase();if(k.length>=4&&!STOP.has(k))m[k]=(m[k]||0)+1});
- return Object.keys(m).sort((a,b)=>m[b]-m[a]||b.length-a.length).slice(0,8);
-}
-const sentences=t=>t.split(/[.!؟?۔\n]+/).map(s=>s.trim()).filter(s=>s.length>=15);
+/* ---------- محضّر الدروس بالذكاء الاصطناعي ---------- */
 function wrap(s,n){
- const w=s.split(/\s+/),L=[''];
+ const w=String(s).split(/\s+/),L=[''];
  for(const x of w){const c=L[L.length-1],j=(c+' '+x).trim();if(j.length<=n)L[L.length-1]=j;else L.push(x)}
  if(L.length>2){L.length=2;L[1]=L[1].slice(0,n-1)+'…'}
  return L;
@@ -156,78 +149,101 @@ function flow(nodes){
  });
  return `<svg class="fc" viewBox="0 0 ${W} ${y-G+4}" role="img" aria-label="مخطط انسيابي">${s}</svg>`;
 }
-function plan(L){
- const en=L.lang==='en',sj=SUBJ[L.subject],t=L.title,tx=L.text;
- const kw=keywords(tx),ks=new Set(kw);
- let ss=sentences(tx);if(!ss.length)ss=[tx.slice(0,200)];
- const pts=ss.slice(0,8);
- const obj=en?[`Students identify the topic: ${t}.`,'Students state the main ideas and key terms of the lesson.','Students apply what they learned to answer questions.']:[`أن يتعرّف الطالب على موضوع «${t}».`,'أن يذكر الطالب أهم الأفكار والمفاهيم الواردة في الدرس.','أن يوظّف الطالب ما تعلّمه في الإجابة عن أسئلة تطبيقية.'];
- const intro=en?['Write the title on the board and link it to prior knowledge.',`Ask a thought-provoking question about "${t}".`]:['اكتب عنوان الدرس على السبورة واربطه بخبرة سابقة للطلاب.',`اطرح سؤالًا مثيرًا للتفكير حول «${t}».`];
- const act=ACT[sj[2]][en?1:0];
- const qs=[];
- for(const s of ss){
-  if(qs.length>=5)break;
-  const w=s.split(/\s+/);
-  const i=w.findIndex(x=>ks.has(x.replace(/[^\p{L}\p{M}]/gu,'').toLowerCase()));
-  if(i>=0&&w.length>=5){const a=w[i].replace(/[^\p{L}\p{M}]/gu,'');w[i]=w[i].replace(a,'______');qs.push([w.join(' '),a])}
- }
- const nodes=[(en?'Start: ':'بداية: ')+t,...ss.slice(0,5),en?'Review & assessment':'التقويم والمراجعة'];
- const li=a=>a.map(x=>`<li dir="auto">${esc(x)}</li>`).join('');
- const ans=qs.map((q,i)=>(i+1)+') '+q[1]).join('   ');
- const html=`<div class="card"><h3 dir="auto">${esc(t)}</h3><p class="mu">${sj[0]} — ${sj[1]}</p>
- <h4>الأهداف</h4><ul>${li(obj)}</ul><h4>التمهيد</h4><ul>${li(intro)}</ul>
- <h4>المفاهيم الأساسية</h4><p dir="auto">${esc(kw.slice(0,6).join('، ')||'—')}</p>
- <h4>الشرح</h4><ol>${li(pts)}</ol><h4>الأنشطة</h4><ul>${li(act)}</ul>
- <h4>أسئلة التقويم (أكمل الفراغ)</h4>${qs.length?`<ol>${li(qs.map(q=>q[0]))}</ol><p class="mu" dir="auto">الإجابات: ${esc(ans)}</p>`:'<p class="mu">النص قصير لتوليد أسئلة تلقائية.</p>'}
- <h4>مخطط انسيابي</h4>${flow(nodes)}</div>`;
- const txt=[t,sj[0]+' - '+sj[1],'','الأهداف',...obj.map(x=>'- '+x),'','التمهيد',...intro.map(x=>'- '+x),'','الشرح',...pts.map((x,i)=>(i+1)+'. '+x),'','الأنشطة',...act.map(x=>'- '+x),'','أسئلة التقويم',...qs.map((q,i)=>(i+1)+'. '+q[0]),qs.length?'الإجابات: '+ans:''].join('\n');
- return{html,txt};
+function makePrompt(L){
+ const sj=SUBJ[L.subject],lang={ar:'العربية',en:'English',both:'العربية مع إبقاء المصطلحات الإنجليزية كما هي'}[L.lang];
+ return `أنت خبير تربوي ومعلم متمرس في منهج دولة ليبيا. حضّر درسًا للمعلم.
+المادة: ${sj[0]} (${sj[1]}). الصف: ${STAGES[S.stage]}. ${L.title?'عنوان الدرس: '+L.title+'.':''}
+${L.text?'نص الدرس:\n'+L.text:'محتوى الدرس موجود في الصورة المرفقة (صفحة من الكتاب المدرسي). اقرأها بعناية بما فيها الجداول والأمثلة.'}
+اعتمد على محتوى الدرس فقط، ولا تضف معلومات غير موجودة فيه إلا للتوضيح البسيط، وكن دقيقًا علميًا ولغويًا، واجعل المستوى مناسبًا للصف.
+لغة التحضير: ${lang}.
+أعد JSON فقط بهذا الشكل بالضبط:
+{"title":"","objectives":["3 إلى 5 أهداف سلوكية قابلة للقياس"],"intro":["2 أو 3 أفكار للتمهيد"],"concepts":[{"term":"","meaning":""}],"explanation":["خطوات الشرح بالترتيب، 4 إلى 8"],"activities":["2 إلى 4 أنشطة مناسبة للمادة"],"questions":{"mcq":[{"q":"","options":["","","",""],"answer":0}],"tf":[{"q":"","answer":true}],"essay":[""]},"flow":["5 إلى 8 مراحل قصيرة (أقل من 8 كلمات) لمخطط انسيابي يلخص تسلسل الدرس"],"summary":["2 إلى 4 نقاط ملخص"]}
+عدد الأسئلة: 4 اختيار من متعدد (answer هو رقم الخيار الصحيح من 0 إلى 3)، و3 صح وخطأ، و2 مقالية. إن تعذّرت قراءة الصورة أعد {"error":"السبب"}.`;
+}
+function planHTML(p,sj){
+ const li=a=>(a||[]).map(x=>`<li dir="auto">${esc(x)}</li>`).join('');
+ const q=p.questions||{};
+ const cn=(p.concepts||[]).map(c=>`<li dir="auto"><b>${esc(c.term)}</b>: ${esc(c.meaning)}</li>`).join('');
+ const mcq=(q.mcq||[]).map(m=>`<li dir="auto">${esc(m.q)}<ol type="a">${(m.options||[]).map((o,i)=>`<li${i===m.answer?' class="ok"':''}>${esc(o)}</li>`).join('')}</ol></li>`).join('');
+ const tf=(q.tf||[]).map(m=>`<li dir="auto">${esc(m.q)} <span class="mu">(${m.answer?'صح':'خطأ'})</span></li>`).join('');
+ return `<div class="card"><h3 dir="auto">${esc(p.title)}</h3><p class="mu">${sj[0]} — ${sj[1]} · ${STAGES[S.stage]}</p>
+ <h4>الأهداف</h4><ul>${li(p.objectives)}</ul><h4>التمهيد</h4><ul>${li(p.intro)}</ul>
+ <h4>المفاهيم الأساسية</h4><ul>${cn}</ul><h4>الشرح</h4><ol>${li(p.explanation)}</ol>
+ <h4>الأنشطة</h4><ul>${li(p.activities)}</ul>
+ <h4>أسئلة اختيار من متعدد</h4><ol>${mcq}</ol><p class="mu">الإجابة الصحيحة باللون الأخضر.</p>
+ <h4>صح أم خطأ</h4><ol>${tf}</ol><h4>أسئلة مقالية</h4><ol>${li(q.essay)}</ol>
+ <h4>الملخص</h4><ul>${li(p.summary)}</ul>
+ <h4>مخطط انسيابي</h4>${flow((p.flow||[]).slice(0,8))}</div>`;
+}
+function planTxt(p,sj){
+ const q=p.questions||{},L=(h,a)=>['',h,...(a||[]).map((x,i)=>(i+1)+'. '+x)];
+ return [p.title,sj[0]+' - '+sj[1]+' - '+STAGES[S.stage],
+  ...L('الأهداف',p.objectives),...L('التمهيد',p.intro),
+  ...L('المفاهيم',(p.concepts||[]).map(c=>c.term+': '+c.meaning)),
+  ...L('الشرح',p.explanation),...L('الأنشطة',p.activities),
+  ...L('اختيار من متعدد',(q.mcq||[]).map(m=>m.q+' | '+(m.options||[]).map((o,i)=>String.fromCharCode(97+i)+') '+o).join('  ')+' | الإجابة: '+String.fromCharCode(97+(m.answer||0)))),
+  ...L('صح أم خطأ',(q.tf||[]).map(m=>m.q+' ('+(m.answer?'صح':'خطأ')+')')),
+  ...L('أسئلة مقالية',q.essay),...L('الملخص',p.summary),...L('مخطط الدرس',p.flow)].join('\n');
 }
 function viewLesson(){
+ IMG=null;
  $('#app').innerHTML=`<section><button class="link" data-view="" style="margin:0 0 10px">→ رجوع</button>
- <h2>محضّر الدروس</h2><p class="lead">صوّر صفحة الدرس أو اكتب نصه، وسيجهّز التطبيق خطة الحصة.</p>
+ <h2>محضّر الدروس</h2><p class="lead">صوّر صفحة الدرس، وسيجهّز الذكاء الاصطناعي تحضيرًا كاملًا.</p>
  <label class="fld">المادة<select id="sj">${SUBJ.map((s,i)=>`<option value="${i}">${s[0]} — ${s[1]}</option>`).join('')}</select></label>
- <label class="fld">لغة نص الدرس<select id="lg"><option value="ar">عربي</option><option value="en">English</option><option value="both">عربي + English</option></select></label>
- <label class="fld">عنوان الدرس<input id="lt" type="text" placeholder="مثال: الخلية" autocomplete="off"></label>
+ <label class="fld">لغة التحضير<select id="lg"><option value="ar">عربي</option><option value="en">English</option><option value="both">عربي + مصطلحات English</option></select></label>
+ <label class="fld">عنوان الدرس (اختياري)<input id="lt" type="text" placeholder="مثال: الزمن الماضي البسيط" autocomplete="off"></label>
  <div class="two"><button class="btn b2" id="cam">📷 تصوير</button><button class="btn b2" id="gal">🖼️ من المعرض</button></div>
  <input id="fc" type="file" accept="image/*" capture="environment" hidden><input id="fg" type="file" accept="image/*" hidden>
+ <img id="pv" alt="صفحة الدرس" hidden>
  <p class="mu" id="pg"></p>
- <label class="fld">نص الدرس (يمكنك تصحيحه)<textarea id="tx" rows="8" dir="auto" placeholder="سيظهر هنا النص المستخرج من الصورة، أو اكتب النص أو الصقه."></textarea></label>
+ <label class="fld">أو اكتب/الصق نص الدرس (اختياري)<textarea id="tx" rows="5" dir="auto" placeholder="يمكنك الاكتفاء بالصورة."></textarea></label>
+ <label class="fld" id="cdw"${getCode()?' hidden':''}>رمز المعلم (مرة واحدة فقط)<input id="cd" type="password" autocomplete="off" dir="ltr"></label>
  <button class="btn" id="gen">حضّر الدرس</button>
  <div id="out"></div>
  <h3>تحضيراتي المحفوظة</h3><div class="list" id="ls"></div></section>`;
  lessons();
 }
 function lessons(){
- $('#ls').innerHTML=D.lessons.length?D.lessons.map(l=>`<div class="row st" data-open="${l.id}" style="cursor:pointer"><span class="bd">${esc(l.title[0]||'؟')}</span><span class="tx"><strong>${esc(l.title)}</strong><small>${SUBJ[l.subject]?SUBJ[l.subject][0]:''}</small></span><button class="del" data-ldel="${l.id}" aria-label="حذف التحضير">✕</button></div>`).join(''):'<p class="mu">لا توجد تحضيرات محفوظة بعد.</p>';
+ $('#ls').innerHTML=D.lessons.length?D.lessons.map(l=>`<div class="row st" data-open="${l.id}" style="cursor:pointer"><span class="bd">${esc((l.title||'؟')[0])}</span><span class="tx"><strong>${esc(l.title)}</strong><small>${SUBJ[l.subject]?SUBJ[l.subject][0]:''}</small></span><button class="del" data-ldel="${l.id}" aria-label="حذف التحضير">✕</button></div>`).join(''):'<p class="mu">لا توجد تحضيرات محفوظة بعد.</p>';
 }
-function gen(){
- const L={title:$('#lt').value.trim()||'درس بدون عنوان',subject:+$('#sj').value,lang:$('#lg').value,text:$('#tx').value.trim()};
- if(!L.text){toast('أضف نص الدرس أولًا');return}
- CUR=L;const p=plan(L);CURT=p.txt;
- $('#out').innerHTML=p.html+'<div class="two"><button class="btn b2" id="sv">💾 حفظ</button><button class="btn b2" id="sh">📤 نسخ / مشاركة</button></div>';
+function show(L){
+ CUR=L;CURT=planTxt(L.plan,SUBJ[L.subject]);
+ $('#out').innerHTML=planHTML(L.plan,SUBJ[L.subject])+'<div class="two"><button class="btn b2" id="sv">💾 حفظ</button><button class="btn b2" id="sh">📤 نسخ / مشاركة</button></div>';
  $('#out').scrollIntoView({behavior:'smooth'});
 }
-const shrink=f=>new Promise((ok,no)=>{const u=URL.createObjectURL(f),i=new Image();i.onload=()=>{const k=Math.min(1,1800/Math.max(i.width,i.height)),c=document.createElement('canvas');c.width=i.width*k;c.height=i.height*k;c.getContext('2d').drawImage(i,0,0,c.width,c.height);URL.revokeObjectURL(u);c.toBlob(b=>b?ok(b):no(),'image/jpeg',.9)};i.onerror=no;i.src=u});
-const loadT=()=>window.Tesseract?Promise.resolve():new Promise((ok,no)=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';s.onload=ok;s.onerror=no;document.head.appendChild(s)});
-async function ocr(f){
- if(!f)return;const pg=$('#pg');
+async function gen(){
+ const L={title:$('#lt').value.trim(),subject:+$('#sj').value,lang:$('#lg').value,text:$('#tx').value.trim()};
+ if(!IMG&&!L.text){toast('صوّر صفحة الدرس أو اكتب نصه أولًا');return}
+ const code=getCode()||$('#cd').value.trim();
+ if(!code){toast('أدخل رمز المعلم');return}
+ const b=$('#gen'),pg=$('#pg');b.disabled=true;b.textContent='جارٍ التحضير… (قد يستغرق دقيقة)';pg.textContent='';
  try{
-  pg.textContent='جارٍ تجهيز الصورة…';
-  const b=await shrink(f);
-  await loadT();
-  pg.textContent='جارٍ قراءة النص… (أول مرة قد تطول لتنزيل اللغة)';
-  const r=await Tesseract.recognize(b,LANGS[$('#lg').value],{logger:m=>{if(m.status==='recognizing text')pg.textContent='جارٍ قراءة النص… '+Math.round(m.progress*100)+'%'}});
-  $('#tx').value=r.data.text.trim();
-  pg.textContent='تمت القراءة. راجع النص وصحّح أي خطأ.';
- }catch(e){pg.textContent='تعذّرت القراءة. تأكد من الإنترنت أو اكتب النص يدويًا.'}
+  const ac=new AbortController(),to=setTimeout(()=>ac.abort(),90000);
+  const r=await fetch(API,{method:'POST',signal:ac.signal,headers:{'content-type':'application/json','x-app-code':code},body:JSON.stringify({prompt:makePrompt(L),image:IMG,mime:'image/jpeg'})});
+  clearTimeout(to);
+  const d=await r.json().catch(()=>({}));
+  if(r.status===401){try{localStorage.removeItem('abc_code')}catch(e){}$('#cdw').hidden=false;toast('الرمز غير صحيح');return}
+  if(!d.text){toast('تعذّر التحضير: '+String(d.error||'لا يوجد رد').slice(0,120));return}
+  let p;try{p=JSON.parse(d.text.replace(/^```json|```$/g,'').trim())}catch(e){toast('جاء الرد بصيغة غير مفهومة، أعد المحاولة');return}
+  if(p.error){toast('تعذّرت القراءة: '+String(p.error).slice(0,120));return}
+  try{localStorage.setItem('abc_code',code)}catch(e){}
+  $('#cdw').hidden=true;
+  show({title:p.title||L.title||'درس',subject:L.subject,lang:L.lang,plan:p});
+ }catch(e){toast(e.name==='AbortError'?'انتهت المهلة، أعد المحاولة':'تعذّر الاتصال، تأكد من الإنترنت')}
+ finally{b.disabled=false;b.textContent='حضّر الدرس'}
+}
+const shrink=f=>new Promise((ok,no)=>{const u=URL.createObjectURL(f),i=new Image();i.onload=()=>{const k=Math.min(1,1600/Math.max(i.width,i.height)),c=document.createElement('canvas');c.width=Math.round(i.width*k);c.height=Math.round(i.height*k);c.getContext('2d').drawImage(i,0,0,c.width,c.height);URL.revokeObjectURL(u);ok(c.toDataURL('image/jpeg',.85))};i.onerror=no;i.src=u});
+async function pick(f){
+ if(!f)return;
+ try{const u=await shrink(f);IMG=u.split(',')[1];const p=$('#pv');p.src=u;p.hidden=false;$('#pg').textContent='تم اختيار الصورة. اضغط «حضّر الدرس».'}
+ catch(e){toast('تعذّر فتح الصورة')}
 }
 async function share(txt,title){
  try{if(navigator.share){await navigator.share({title,text:txt});return}}catch(e){if(e.name==='AbortError')return}
  try{await navigator.clipboard.writeText(txt);toast('تم نسخ التحضير')}catch(e){toast('تعذّر النسخ')}
 }
 let tt;
-function toast(t){const e=$('#toast');e.textContent=t;e.classList.add('on');clearTimeout(tt);tt=setTimeout(()=>e.classList.remove('on'),2600)}
+function toast(t){const e=$('#toast');e.textContent=t;e.classList.add('on');clearTimeout(tt);tt=setTimeout(()=>e.classList.remove('on'),3500)}
 document.addEventListener('click',e=>{
  const a=e.target.closest('[data-role]');
  if(a){S.role=a.dataset.role||null;V='';save();render();window.scrollTo(0,0);return}
@@ -244,12 +260,12 @@ document.addEventListener('click',e=>{
  if(e.target.closest('#cam')){$('#fc').click();return}
  if(e.target.closest('#gal')){$('#fg').click();return}
  if(e.target.closest('#gen')){gen();return}
- if(e.target.closest('#sv')){if(CUR){D.lessons.unshift(Object.assign({id:Date.now()},CUR));saveD();lessons();toast('تم حفظ التحضير')}return}
+ if(e.target.closest('#sv')){if(CUR){D.lessons.unshift(Object.assign({},CUR,{id:Date.now()}));saveD();lessons();toast('تم حفظ التحضير')}return}
  if(e.target.closest('#sh')){share(CURT,CUR?CUR.title:'');return}
  const ld=e.target.closest('[data-ldel]');
  if(ld){if(confirm('حذف هذا التحضير؟')){D.lessons=D.lessons.filter(l=>String(l.id)!==ld.dataset.ldel);saveD();lessons()}return}
  const op=e.target.closest('[data-open]');
- if(op){const l=D.lessons.find(x=>String(x.id)===op.dataset.open);if(l){$('#sj').value=l.subject;$('#lg').value=l.lang;$('#lt').value=l.title;$('#tx').value=l.text;gen()}return}
+ if(op){const l=D.lessons.find(x=>String(x.id)===op.dataset.open);if(l){$('#sj').value=l.subject;$('#lg').value=l.lang;$('#lt').value=l.title||'';show(l)}return}
  const m=e.target.closest('.row');
  if(m&&m.dataset.k==='students'){V='students';render();window.scrollTo(0,0);return}
  if(m&&m.dataset.k==='lesson'){V='lesson';render();window.scrollTo(0,0);return}
@@ -259,7 +275,7 @@ document.addEventListener('input',e=>{if(e.target.id==='q')listStudents()});
 document.addEventListener('change',e=>{
  if(e.target.id==='stage'){S.stage=+e.target.value;save()}
  if(e.target.id==='fs')listStudents();
- if(e.target.id==='fc'||e.target.id==='fg'){ocr(e.target.files[0]);e.target.value=''}
+ if(e.target.id==='fc'||e.target.id==='fg'){pick(e.target.files[0]);e.target.value=''}
 });
 render();
 </script>
