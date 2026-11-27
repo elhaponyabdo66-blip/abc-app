@@ -56,6 +56,7 @@ select,input,textarea{display:block;width:100%;margin-top:6px;padding:12px;borde
 .card ul,.card ol{margin:0;padding-inline-start:22px}
 .card li{margin-bottom:4px}
 .card li.ok{color:var(--g);font-weight:700}
+.tip{background:var(--card);border:1px solid var(--a);border-radius:12px;padding:10px 12px;margin:8px 0 14px;font-size:14px}
 #pv{display:block;max-width:100%;max-height:220px;border-radius:12px;margin:8px 0}
 .fc{width:100%;height:auto;max-width:340px;display:block;margin:8px auto}
 .fc rect{fill:var(--bg);stroke:var(--g);stroke-width:2}
@@ -76,6 +77,7 @@ select,input,textarea{display:block;width:100%;margin-top:6px;padding:12px;borde
 <div id="toast" role="status" aria-live="polite"></div>
 <script>
 const API='https://abc-ai.elhaponyabdo66.workers.dev';
+const DAILY=4;
 const $=s=>document.querySelector(s);
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const ROLES={
@@ -99,6 +101,16 @@ D.lessons=(D.lessons||[]).filter(l=>l&&l.plan);
 const save=()=>{try{localStorage.setItem('abc',JSON.stringify(S))}catch(e){}};
 const saveD=()=>{try{localStorage.setItem('abc_d',JSON.stringify(D))}catch(e){}};
 const getCode=()=>{try{return localStorage.getItem('abc_code')||''}catch(e){return ''}};
+const getUid=()=>{try{let u=localStorage.getItem('abc_uid');if(!u){const a=new Uint8Array(12);crypto.getRandomValues(a);u=Array.from(a,x=>x.toString(16).padStart(2,'0')).join('');localStorage.setItem('abc_uid',u)}return u}catch(e){return 'anon'}};
+const today=()=>new Date(Date.now()+7200000).toISOString().slice(0,10);
+function leftText(){
+ try{const o=JSON.parse(localStorage.getItem('abc_left')||'{}');if(o.day===today())return 'المتبقي اليوم: '+o.left+' من '+DAILY+' تحضيرات'}catch(e){}
+ return 'لديك '+DAILY+' تحضيرات يوميًا';
+}
+function setLeft(n){
+ try{localStorage.setItem('abc_left',JSON.stringify({day:today(),left:n}))}catch(e){}
+ const e=$('#lf');if(e)e.textContent=leftText();
+}
 function render(){
  const app=$('#app');
  if(!ROLES[S.role]){
@@ -188,7 +200,8 @@ function planTxt(p,sj){
 function viewLesson(){
  IMG=null;
  $('#app').innerHTML=`<section><button class="link" data-view="" style="margin:0 0 10px">→ رجوع</button>
- <h2>محضّر الدروس</h2><p class="lead">صوّر صفحة الدرس، وسيجهّز الذكاء الاصطناعي تحضيرًا كاملًا.</p>
+ <h2>محضّر الدروس</h2><p class="lead" style="margin-bottom:6px">صوّر صفحة الدرس، وسيجهّز الذكاء الاصطناعي تحضيرًا كاملًا.</p>
+ <p class="mu" id="lf">${leftText()}</p>
  <label class="fld">المادة<select id="sj">${SUBJ.map((s,i)=>`<option value="${i}">${s[0]} — ${s[1]}</option>`).join('')}</select></label>
  <label class="fld">لغة التحضير<select id="lg"><option value="ar">عربي</option><option value="en">English</option><option value="both">عربي + مصطلحات English</option></select></label>
  <label class="fld">عنوان الدرس (اختياري)<input id="lt" type="text" placeholder="مثال: الزمن الماضي البسيط" autocomplete="off"></label>
@@ -211,23 +224,26 @@ function show(L){
  $('#out').innerHTML=planHTML(L.plan,SUBJ[L.subject])+'<div class="two"><button class="btn b2" id="sv">💾 حفظ</button><button class="btn b2" id="sh">📤 نسخ / مشاركة</button></div>';
  $('#out').scrollIntoView({behavior:'smooth'});
 }
+const TIPS='نصيحة: صوّر الصفحة بإضاءة جيدة وبشكل مستقيم من الأعلى بدون ظل أو انعكاس، وركّز على الدرس نفسه (جزء واحد من الصفحة أفضل من صفحة مزدحمة)، أو اكتب النص في الخانة أسفل الصورة.';
 async function gen(){
  const L={title:$('#lt').value.trim(),subject:+$('#sj').value,lang:$('#lg').value,text:$('#tx').value.trim()};
  if(!IMG&&!L.text){toast('صوّر صفحة الدرس أو اكتب نصه أولًا');return}
  const code=getCode()||$('#cd').value.trim();
  if(!code){toast('أدخل رمز المعلم');return}
- const b=$('#gen'),pg=$('#pg');b.disabled=true;b.textContent='جارٍ التحضير… (قد يستغرق دقيقة)';pg.textContent='';
+ const b=$('#gen'),pg=$('#pg');b.disabled=true;b.textContent='جارٍ التحضير…';pg.textContent='';
  try{
   const ac=new AbortController(),to=setTimeout(()=>ac.abort(),90000);
-  const r=await fetch(API,{method:'POST',signal:ac.signal,headers:{'content-type':'application/json','x-app-code':code},body:JSON.stringify({prompt:makePrompt(L),image:IMG,mime:'image/jpeg'})});
+  const r=await fetch(API,{method:'POST',signal:ac.signal,headers:{'content-type':'application/json','x-app-code':code,'x-uid':getUid()},body:JSON.stringify({prompt:makePrompt(L),image:IMG,mime:'image/jpeg'})});
   clearTimeout(to);
   const d=await r.json().catch(()=>({}));
   if(r.status===401){try{localStorage.removeItem('abc_code')}catch(e){}$('#cdw').hidden=false;toast('الرمز غير صحيح');return}
+  if(r.status===429){setLeft(0);toast(d.error||'استهلكت تحضيراتك اليومية');return}
   if(!d.text){toast('تعذّر التحضير: '+String(d.error||'لا يوجد رد').slice(0,120));return}
   let p;try{p=JSON.parse(d.text.replace(/^```json|```$/g,'').trim())}catch(e){toast('جاء الرد بصيغة غير مفهومة، أعد المحاولة');return}
-  if(p.error){toast('تعذّرت القراءة: '+String(p.error).slice(0,120));return}
+  if(p.error){pg.innerHTML='<div class="tip">تعذّرت قراءة الصورة: '+esc(p.error)+'<br>'+esc(TIPS)+'</div>';toast('تعذّرت قراءة الصورة');return}
   try{localStorage.setItem('abc_code',code)}catch(e){}
   $('#cdw').hidden=true;
+  if(typeof d.left==='number')setLeft(d.left);
   show({title:p.title||L.title||'درس',subject:L.subject,lang:L.lang,plan:p});
  }catch(e){toast(e.name==='AbortError'?'انتهت المهلة، أعد المحاولة':'تعذّر الاتصال، تأكد من الإنترنت')}
  finally{b.disabled=false;b.textContent='حضّر الدرس'}
